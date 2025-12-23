@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="uz">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Converter</title>
     <link rel="stylesheet" href="style/style.css">
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -56,7 +58,42 @@
         </div>
     </div>
     </div>
+    <div class="modal" id="converterModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Converter</h2>
+
+            <div class="upload-area" id="uploadArea">
+                <p>📁 Faylni shu yerga tashlang yoki tanlang</p>
+                <input type="file" id="fileInput" multiple>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    Fayl tanlash
+                </button>
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="options-area" id="optionsArea" style="display:none;"></div>
+
+            <button class="convert-btn" id="convertBtn" onclick="convertFiles()" disabled>
+                Konvertatsiya qilish
+            </button>
+
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+
+            <div class="result-area" id="resultArea">
+                <h3>✅ Tayyor!</h3>
+                <p id="resultMessage"></p>
+                <div id="downloadArea"></div>
+            </div>
+
+            <div class="file-info" id="fileInfo" style="display:none;"></div>
+        </div>
+    </div>
 
 
 </body>
+
 </html>
