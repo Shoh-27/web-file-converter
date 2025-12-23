@@ -201,3 +201,72 @@ body {
     font-weight: bold;
 }
 
+.result-area {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9ff;
+    border-radius: 10px;
+    display: none;
+}
+
+.download-btn {
+    background: #2196F3;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 10px 5px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.file-info {
+    background: #fff3cd;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 15px;
+}
+
+.options-area {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9ff;
+    border-radius: 10px;
+}
+
+.options-area label {
+    display: block;
+    margin: 10px 0;
+}
+
+.options-area input {
+    margin-right: 10px;
+}
+
+.page-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.page-item {
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.page-item:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.page-item.selected {
+    border-color: #667eea;
+    background: #e8ebff;
+}
