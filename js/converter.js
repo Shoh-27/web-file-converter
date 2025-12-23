@@ -227,3 +227,46 @@ async function convertImageToPdf() {
     const pdfBlob = pdf.output('blob');
     showResult([{ blob: pdfBlob, name: 'images.pdf' }]);
 }
+
+async function convertPdfToTxt() {
+    const file = selectedFiles[0];
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += `--- Sahifa ${i} ---\n${pageText}\n\n`;
+    }
+
+    const txtBlob = new Blob([fullText], { type: 'text/plain' });
+    showResult([{ blob: txtBlob, name: file.name.replace('.pdf', '.txt') }]);
+}
+
+async function convertDocxToPdf() {
+    const file = selectedFiles[0];
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+
+    const lines = pdf.splitTextToSize(result.value, 180);
+    let y = 20;
+
+    lines.forEach(line => {
+        if (y > 280) {
+            pdf.addPage();
+            y = 20;
+        }
+        pdf.text(line, 15, y);
+        y += 7;
+    });
+
+    const pdfBlob = pdf.output('blob');
+    showResult([{ blob: pdfBlob, name: file.name.replace(/\.(doc|docx)$/, '.pdf') }]);
+}
+
