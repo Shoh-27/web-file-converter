@@ -345,3 +345,49 @@ async function mergePdf() {
     showResult([{ blob: pdfBlob, name: 'merged.pdf' }]);
 }
 
+function analyzeFile() {
+    const file = selectedFiles[0];
+    const fileInfo = document.getElementById('fileInfo');
+
+    fileInfo.innerHTML = `
+                <h3>📊 Fayl ma'lumotlari:</h3>
+                <p><strong>Nomi:</strong> ${file.name}</p>
+                <p><strong>Turi:</strong> ${file.type || 'Noma\'lum'}</p>
+                <p><strong>Hajmi:</strong> ${formatFileSize(file.size)}</p>
+                <p><strong>O'zgartirilgan:</strong> ${new Date(file.lastModified).toLocaleString('uz-UZ')}</p>
+            `;
+
+    fileInfo.style.display = 'block';
+    document.getElementById('resultArea').style.display = 'block';
+    document.getElementById('resultMessage').textContent = 'Fayl tahlili yakunlandi!';
+}
+
+function readFileAsDataURL(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(file);
+    });
+}
+
+function showResult(results) {
+    const resultArea = document.getElementById('resultArea');
+    const downloadArea = document.getElementById('downloadArea');
+    downloadArea.innerHTML = '';
+
+    results.forEach((result, index) => {
+        const url = URL.createObjectURL(result.blob);
+        const btn = document.createElement('a');
+        btn.className = 'download-btn';
+        btn.href = url;
+        btn.download = result.name;
+        btn.textContent = `📥 ${result.name}`;
+        downloadArea.appendChild(btn);
+    });
+
+    document.getElementById('resultMessage').textContent =
+        results.length > 1
+            ? `${results.length} ta fayl tayyor!`
+            : 'Faylingiz tayyor!';
+    resultArea.style.display = 'block';
+}
