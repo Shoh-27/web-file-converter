@@ -14,3 +14,10 @@ COPY package*.json ./
 
 RUN npm install
 
+COPY . .
+
+RUN mkdir -p uploads output public
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
