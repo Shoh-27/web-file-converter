@@ -6,4 +6,16 @@ services:
     container_name: file-converter-app
     ports:
       - "3000:3000"
-    
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+      - ./public:/app/public
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
