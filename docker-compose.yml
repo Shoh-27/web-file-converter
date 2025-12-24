@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  file-converter:
+    build: .
+    container_name: file-converter-app
+    ports:
+      - "3000:3000"
+    
