@@ -141,4 +141,21 @@ body {
     max-width: 700px;
     opacity: 0.9;
 }
+.hero-btn {
+    margin-top: 30px;
+    display: inline-block;
+    background: linear-gradient(135deg, #00e5ff, #00bcd4);
+    color: #000;
+    padding: 14px 36px;
+    border-radius: 30px;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.hero-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 10px 25px rgba(0, 229, 255, 0.4);
+}
 
