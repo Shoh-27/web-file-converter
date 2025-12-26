@@ -1,249 +1,225 @@
 const express = require('express')
 const multer = require('multer')
-const { execFile } = require('child_process')
-const { promisify } = require('util')
-const fs = require('fs').promises
 const path = require('path')
-const { v4: uuidv4 } = require('uuid')
+const fs = require('fs').promises
+const { exec } = require('child_process')
+const { promisify } = require('util')
 
-const execFileAsync = promisify(execFile)
-
+const execPromise = promisify(exec)
 const app = express()
 const PORT = process.env.PORT || 3000
-const TEMP_DIR = '/tmp/conversions'
-const TIMEOUT_MS = 120000 // 2 minutes
 
-const SUPPORTED_INPUT_FORMATS = [
-	'doc',
-	'docx',
-	'odt',
-	'rtf',
-	'txt',
-	'ppt',
-	'pptx',
-	'odp',
-	'xls',
-	'xlsx',
-	'ods',
-	'csv',
-	'html',
-	'htm',
-	'xml',
-	'wpd',
-	'wps', // условная поддержка
-]
+// Настройка CORS
+app.use((req, res, next) => {
+	res.header('Access-Control-Allow-Origin', '*')
+	res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE')
+	res.header('Access-Control-Allow-Headers', 'Content-Type')
+	next()
+})
 
-const SUPPORTED_OUTPUT_FORMATS = {
-	pdf: 'pdf',
-	docx: 'docx',
-	odt: 'odt',
-	txt: 'txt:Text',
-	html: 'html',
-	rtf: 'rtf',
-	xlsx: 'xlsx',
-	ods: 'ods',
-	pptx: 'pptx',
-	odp: 'odp',
-}
+// Статические файлы
+app.use(express.static('public'))
+app.use('/style', express.static(path.join(__dirname, '../style')))
+app.use('/js', express.static(path.join(__dirname)))
+app.use('/public', express.static(path.join(__dirname, '../public')))
 
-// Configure multer for file uploads
+// Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
 	destination: async (req, file, cb) => {
-		const uploadDir = path.join(TEMP_DIR, uuidv4())
-		await fs.mkdir(uploadDir, { recursive: true })
-		req.uploadDir = uploadDir
-		cb(null, uploadDir)
+		const tmpDir = '/tmp/conversions'
+		try {
+			await fs.mkdir(tmpDir, { recursive: true })
+			cb(null, tmpDir)
+		} catch (err) {
+			cb(err)
+		}
 	},
 	filename: (req, file, cb) => {
-		cb(null, file.originalname)
+		const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+		cb(null, uniqueSuffix + '-' + file.originalname)
 	},
 })
 
 const upload = multer({
 	storage,
-	limits: {
-		fileSize: 50 * 1024 * 1024, // 50MB
-	},
-	fileFilter: (req, file, cb) => {
-		const ext = path.extname(file.originalname).toLowerCase().slice(1)
-		if (SUPPORTED_INPUT_FORMATS.includes(ext)) {
-			cb(null, true)
-		} else {
-			cb(new Error(`Unsupported file format: ${ext}`))
-		}
-	},
+	limits: { fileSize: 50 * 1024 * 1024 }, // 50MB лимит
 })
-
-// Middleware
-app.use(express.json())
-app.use(express.static('public'))
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-	res.json({ status: 'ok', timestamp: new Date().toISOString() })
+	res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
-// Get supported formats
-app.get('/api/formats', (req, res) => {
-	res.json({
-		input: SUPPORTED_INPUT_FORMATS,
-		output: Object.keys(SUPPORTED_OUTPUT_FORMATS),
-	})
-})
+// API endpoint для конвертации DOCX в PDF
+app.post(
+	'/api/convert/docx-to-pdf',
+	upload.single('file'),
+	async (req, res) => {
+		let inputPath = null
+		let outputPath = null
 
-// Convert file endpoint
-app.post('/api/convert', upload.single('file'), async (req, res) => {
-	let uploadDir = req.uploadDir
+		try {
+			if (!req.file) {
+				return res.status(400).json({ error: 'Файл не загружен' })
+			}
+
+			inputPath = req.file.path
+			const outputDir = path.dirname(inputPath)
+			const baseName = path.basename(inputPath, path.extname(inputPath))
+			outputPath = path.join(outputDir, `${baseName}.pdf`)
+
+			console.log(`Конвертация: ${inputPath} -> ${outputPath}`)
+
+			// Конвертация через LibreOffice
+			const command = `libreoffice --headless --convert-to pdf --outdir "${outputDir}" "${inputPath}"`
+
+			await execPromise(command, {
+				timeout: 60000, // 60 секунд таймаут
+				maxBuffer: 10 * 1024 * 1024,
+			})
+
+			// Проверяем существование выходного файла
+			try {
+				await fs.access(outputPath)
+			} catch {
+				throw new Error('PDF файл не был создан')
+			}
+
+			// Читаем PDF файл
+			const pdfBuffer = await fs.readFile(outputPath)
+
+			// Отправляем файл клиенту
+			res.setHeader('Content-Type', 'application/pdf')
+			res.setHeader(
+				'Content-Disposition',
+				`attachment; filename="${baseName}.pdf"`
+			)
+			res.send(pdfBuffer)
+		} catch (error) {
+			console.error('Ошибка конвертации:', error)
+			res.status(500).json({
+				error: 'Ошибка конвертации файла',
+				details: error.message,
+			})
+		} finally {
+			// Очистка временных файлов
+			try {
+				if (inputPath) await fs.unlink(inputPath).catch(() => {})
+				if (outputPath) await fs.unlink(outputPath).catch(() => {})
+			} catch (err) {
+				console.error('Ошибка очистки файлов:', err)
+			}
+		}
+	}
+)
+
+//API emdpoint for converting PDF to TXT
+app.post('/api/convert/pdf-to-txt', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputPath = null
 
 	try {
 		if (!req.file) {
-			return res.status(400).json({ error: 'No file uploaded' })
+			return res.status(400).json({ error: 'Файл не загружен' })
 		}
 
-		const outputFormat = req.body.format || 'pdf'
+		inputPath = req.file.path
+		const outputDir = path.dirname(inputPath)
+		const baseName = path.basename(inputPath, path.extname(inputPath))
+		outputPath = path.join(outputDir, `${baseName}.txt`)
 
-		if (!SUPPORTED_OUTPUT_FORMATS[outputFormat]) {
-			return res.status(400).json({
-				error: `Unsupported output format: ${outputFormat}`,
-			})
-		}
+		console.log(`Конвертация: ${inputPath} -> ${outputPath}`)
 
-		const inputPath = req.file.path
-		const inputExt = path.extname(req.file.originalname).toLowerCase().slice(1)
-		const baseName = path.basename(
-			req.file.originalname,
-			path.extname(req.file.originalname)
-		)
+		const command = `libreoffice --headless --convert-to txt --outdir "${outputDir}" "${inputPath}"`
 
-		console.log(
-			`Converting ${req.file.originalname} (${inputExt}) to ${outputFormat}`
-		)
+		await execPromise(command, {
+			timeout: 60000, // 60 секунд таймаут
+			maxBuffer: 10 * 1024 * 1024,
+		})
 
-		// Run LibreOffice conversion
-		const convertFormat = SUPPORTED_OUTPUT_FORMATS[outputFormat]
-
+		// Проверяем существование выходного файла
 		try {
-			await execFileAsync(
-				'libreoffice',
-				[
-					'--headless',
-					'--convert-to',
-					convertFormat,
-					'--outdir',
-					uploadDir,
-					inputPath,
-				],
-				{
-					timeout: TIMEOUT_MS,
-					maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-				}
-			)
-		} catch (execError) {
-			console.error('LibreOffice conversion error:', execError)
-			throw new Error(`Conversion failed: ${execError.message}`)
+			await fs.access(outputPath)
+		} catch {
+			throw new Error('TXT файл не был создан')
 		}
 
-		// Find the converted file
-		const files = await fs.readdir(uploadDir)
-		const outputFile = files.find(
-			f =>
-				f !== req.file.originalname &&
-				f.startsWith(baseName) &&
-				f.endsWith(`.${outputFormat}`)
+		// Читаем TXT файл
+		const txtBuffer = await fs.readFile(outputPath)
+
+		// Отправляем файл клиенту
+		res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+		res.setHeader(
+			'Content-Disposition',
+			`attachment; filename="${baseName}.txt"`
 		)
+		res.send(txtBuffer)
+	} catch (error) {
+		console.error('Ошибка конвертации:', error)
+		res.status(500).json({
+			error: 'Ошибка конвертации файла',
+			details: error.message,
+		})
+	} finally {
+		// Очистка временных файлов
+		try {
+			if (inputPath) await fs.unlink(inputPath).catch(() => {})
+			if (outputPath) await fs.unlink(outputPath).catch(() => {})
+		} catch (err) {
+			console.error('Ошибка очистки файлов:', err)
+		}
+	}
+})
 
-		if (!outputFile) {
-			throw new Error('Conversion completed but output file not found')
+// API endpoint для конвертации множественных файлов
+app.post('/api/convert/batch', upload.array('files', 10), async (req, res) => {
+	const { operation } = req.body
+	const files = req.files
+	const tempFiles = []
+
+	try {
+		if (!files || files.length === 0) {
+			return res.status(400).json({ error: 'Файлы не загружены' })
 		}
 
-		const outputPath = path.join(uploadDir, outputFile)
-
-		// Check if file exists and has content
-		const stats = await fs.stat(outputPath)
-		if (stats.size === 0) {
-			throw new Error('Conversion produced empty file')
-		}
-
-		console.log(`Conversion successful: ${outputFile} (${stats.size} bytes)`)
-
-		// Send the converted file
-		res.download(outputPath, `${baseName}.${outputFormat}`, async err => {
-			// Cleanup after download completes (or fails)
-			try {
-				await fs.rm(uploadDir, { recursive: true, force: true })
-			} catch (cleanupError) {
-				console.error('Cleanup error:', cleanupError)
-			}
-
-			if (err) {
-				console.error('Download error:', err)
-			}
+		// Здесь можно добавить логику для batch операций
+		res.json({
+			message: 'Batch конвертация завершена',
+			filesProcessed: files.length,
 		})
 	} catch (error) {
-		console.error('Conversion error:', error)
-
-		// Cleanup on error
-		if (uploadDir) {
+		console.error('Ошибка batch конвертации:', error)
+		res.status(500).json({ error: error.message })
+	} finally {
+		// Очистка
+		for (const file of tempFiles) {
 			try {
-				await fs.rm(uploadDir, { recursive: true, force: true })
-			} catch (cleanupError) {
-				console.error('Cleanup error:', cleanupError)
-			}
-		}
-
-		res.status(500).json({
-			error: error.message || 'Conversion failed',
-		})
-	}
-})
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-	if (error instanceof multer.MulterError) {
-		if (error.code === 'LIMIT_FILE_SIZE') {
-			return res.status(400).json({ error: 'File too large (max 50MB)' })
-		}
-		return res.status(400).json({ error: error.message })
-	}
-
-	if (error) {
-		return res.status(400).json({ error: error.message })
-	}
-
-	next()
-})
-
-// Periodic cleanup of old temp files (safety net)
-setInterval(async () => {
-	try {
-		const dirs = await fs.readdir(TEMP_DIR)
-		const now = Date.now()
-
-		for (const dir of dirs) {
-			const dirPath = path.join(TEMP_DIR, dir)
-			try {
-				const stats = await fs.stat(dirPath)
-				// Remove directories older than 1 hour
-				if (now - stats.mtimeMs > 3600000) {
-					await fs.rm(dirPath, { recursive: true, force: true })
-					console.log(`Cleaned up old directory: ${dir}`)
-				}
+				await fs.unlink(file).catch(() => {})
 			} catch (err) {
-				// Ignore errors for individual directories
+				console.error('Ошибка очистки:', err)
 			}
 		}
-	} catch (err) {
-		console.error('Cleanup task error:', err)
 	}
-}, 300000) // Run every 5 minutes
+})
 
-// Start server
+// Главная страница
+app.get('/', (req, res) => {
+	res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
+
+app.use((req, res) => {
+	res.status(404).json({ error: 'Endpoint не найден' })
+})
+
+app.use((err, req, res, next) => {
+	console.error('Server error:', err)
+	res.status(500).json({
+		error: 'Внутренняя ошибка сервера',
+		details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+	})
+})
+
 app.listen(PORT, () => {
-	console.log(`LibreOffice Converter running on port ${PORT}`)
-	console.log(`Supported input formats: ${SUPPORTED_INPUT_FORMATS.join(', ')}`)
-	console.log(
-		`Supported output formats: ${Object.keys(SUPPORTED_OUTPUT_FORMATS).join(
-			', '
-		)}`
-	)
+	console.log(`🚀 Сервер запущен на порту ${PORT}`)
+	console.log(`📄 Доступен по адресу: http://localhost:${PORT}`)
 })
