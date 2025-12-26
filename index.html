@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="uz">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Converter</title>
+    <title>File Converter | Bosh sahifa</title>
     <link rel="stylesheet" href="style/index.css">
 </head>
 
 <body>
-      <nav class="navbar">
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
         <div class="nav-container">
             <div class="logo">📄 File Converter</div>
             <ul class="nav-links" id="navLinks">
-                <li><a href="index.html">Bosh sahifa</a></li>
-                <li><a href="pdf.html" class="active">PDF Xizmatlari</a></li>
+                <li><a href="index.html" class="active">Bosh sahifa</a></li>
+                <li><a href="pdf.html">PDF Xizmatlari</a></li>
                 <li><a href="about.html">Biz haqimizda</a></li>
                 <li><a href="contact.html">Aloqa</a></li>
             </ul>
@@ -22,10 +23,27 @@
         </div>
     </nav>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <script src="js/converter.js"></script>
-</body>
+    <!-- HERO -->
+    <section class="hero">
+        <h1>📁 Universal File Converter</h1>
+        <p>
+            Fayllarni tez, xavfsiz va sifatli tarzda konvertatsiya qiling.
+            Hech qanday ro‘yxatdan o‘tishsiz.
+        </p>
+        <a href="pdf.html" class="hero-btn">🚀 Boshlash</a>
+    </section>
 
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>© 2025 File Converter. Barcha huquqlar himoyalangan.</p>
+    </footer>
+
+    <!-- JS -->
+    <script>
+        function toggleMenu() {
+            document.getElementById("navLinks").classList.toggle("show");
+        }
+    </script>
+
+</body>
 </html>
