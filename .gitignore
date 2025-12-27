@@ -1,0 +1,55 @@
+# ===============================
+# Node.js
+# ===============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env
+
+# ===============================
+# Runtime & build
+# ===============================
+dist/
+build/
+coverage/
+
+# ===============================
+# Docker
+# ===============================
+.dockerignore
+docker-compose.override.yml
+
+# ===============================
+# Upload / temp files
+# (file converter loyihalar uchun juda muhim)
+# ===============================
+uploads/
+output/
+tmp/
+temp/
+
+# ===============================
+# OS files
+# ===============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===============================
+# Logs
+# ===============================
+logs/
+*.log
+
+# ===============================
+# LibreOffice cache (Docker ichida ch
