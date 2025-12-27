@@ -407,6 +407,92 @@ app.post('/api/convert/xlsx-sheets-to-pdf', upload.single('file'), async (req, r
 	}
 })
 
+// ==========================================
+// 4. Ko'p XLSX fayllarni bitta PDF ga birlashtirish
+// ==========================================
+app.post('/api/convert/xlsx-merge-to-pdf', upload.array('files', 10), async (req, res) => {
+	const files = req.files
+	let outputPath = null
+
+	try {
+		if (!files || files.length === 0) {
+			return res.status(400).json({ error: 'Fayllar yuklanmadi' })
+		}
+
+		outputPath = path.join('/tmp/conversions', `merged-${Date.now()}.pdf`)
+
+		const doc = new PDFDocument({ margin: 30 })
+		const stream = require('fs').createWriteStream(outputPath)
+		doc.pipe(stream)
+
+		// Har bir fayl uchun
+		for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+			const file = files[fileIdx]
+			const workbook = XLSX.readFile(file.path)
+
+			// Har bir sheet uchun
+			for (let i = 0; i < workbook.SheetNames.length; i++) {
+				if (fileIdx > 0 || i > 0) doc.addPage()
+
+				const sheetName = workbook.SheetNames[i]
+				const sheet = workbook.Sheets[sheetName]
+				const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+
+				// Fayl va sheet nomi
+				doc
+					.fontSize(14)
+					.text(`File: ${file.originalname} - Sheet: ${sheetName}`, { align: 'center' })
+				doc.moveDown()
+
+				// Jadval
+				const cellWidth = 70
+				const cellHeight = 25
+				let yPos = doc.y
+
+				data.forEach((row, rowIndex) => {
+					let xPos = 30
+					row.forEach((cell) => {
+						doc.rect(xPos, yPos, cellWidth, cellHeight).stroke()
+						doc.fontSize(9).text(String(cell || ''), xPos + 5, yPos + 8, {
+							width: cellWidth - 10,
+							ellipsis: true,
+						})
+						xPos += cellWidth
+					})
+					yPos += cellHeight
+
+					if (yPos > 700 && rowIndex < data.length - 1) {
+						doc.addPage()
+						yPos = 50
+					}
+				})
+			}
+
+			await fs.unlink(file.path).catch(() => {})
+		}
+
+		doc.end()
+
+		await new Promise((resolve, reject) => {
+			stream.on('finish', resolve)
+			stream.on('error', reject)
+		})
+
+		const pdfBuffer = await fs.readFile(outputPath)
+
+		res.setHeader('Content-Type', 'application/pdf')
+		res.setHeader('Content-Disposition', `attachment; filename="merged-${Date.now()}.pdf"`)
+		res.send(pdfBuffer)
+	} catch (error) {
+		console.error('Merge XLSX xato:', error)
+		res.status(500).json({ error: 'Birlashtirish xatosi', details: error.message })
+	} finally {
+		if (outputPath) await fs.unlink(outputPath).catch(() => {})
+		for (const file of files) {
+			await fs.unlink(file.path).catch(() => {})
+		}
+	}
+})
 
 
 console.log('✅ XLSX Converter API endpoints qo\'shildi')
