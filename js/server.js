@@ -325,6 +325,89 @@ app.post('/api/convert/xlsx-to-images', upload.single('file'), async (req, res) 
 	}
 })
 
+// ==========================================
+// 3. XLSX ma'lum sheetlarini PDF qilish
+// ==========================================
+app.post('/api/convert/xlsx-sheets-to-pdf', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputPath = null
+
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Fayl yuklanmadi' })
+		}
+
+		const { sheets = '0' } = req.body // "0,1,2" format
+		const selectedSheets = sheets.split(',').map((s) => parseInt(s.trim()))
+
+		inputPath = req.file.path
+		outputPath = path.join('/tmp/conversions', `${Date.now()}.pdf`)
+
+		const workbook = XLSX.readFile(inputPath)
+		const doc = new PDFDocument({ margin: 30 })
+		const stream = require('fs').createWriteStream(outputPath)
+		doc.pipe(stream)
+
+		// Tanlangan sheetlar
+		selectedSheets.forEach((sheetIndex, idx) => {
+			if (sheetIndex >= workbook.SheetNames.length) return
+
+			const sheetName = workbook.SheetNames[sheetIndex]
+			const sheet = workbook.Sheets[sheetName]
+			const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+
+			if (idx > 0) doc.addPage()
+
+			// Sheet nomi
+			doc.fontSize(16).text(`Sheet: ${sheetName}`, { align: 'center' })
+			doc.moveDown()
+
+			// Jadval
+			const cellWidth = 80
+			const cellHeight = 25
+			let yPos = doc.y
+
+			data.forEach((row, rowIndex) => {
+				let xPos = 30
+				row.forEach((cell) => {
+					doc.rect(xPos, yPos, cellWidth, cellHeight).stroke()
+					doc.fontSize(10).text(String(cell || ''), xPos + 5, yPos + 8, {
+						width: cellWidth - 10,
+						ellipsis: true,
+					})
+					xPos += cellWidth
+				})
+				yPos += cellHeight
+
+				if (yPos > 700 && rowIndex < data.length - 1) {
+					doc.addPage()
+					yPos = 50
+				}
+			})
+		})
+
+		doc.end()
+
+		await new Promise((resolve, reject) => {
+			stream.on('finish', resolve)
+			stream.on('error', reject)
+		})
+
+		const pdfBuffer = await fs.readFile(outputPath)
+
+		res.setHeader('Content-Type', 'application/pdf')
+		res.setHeader('Content-Disposition', `attachment; filename="sheets-${Date.now()}.pdf"`)
+		res.send(pdfBuffer)
+	} catch (error) {
+		console.error('XLSX Sheets → PDF xato:', error)
+		res.status(500).json({ error: 'Konvertatsiya xatosi', details: error.message })
+	} finally {
+		if (inputPath) await fs.unlink(inputPath).catch(() => {})
+		if (outputPath) await fs.unlink(outputPath).catch(() => {})
+	}
+})
+
+
 
 console.log('✅ XLSX Converter API endpoints qo\'shildi')
 
