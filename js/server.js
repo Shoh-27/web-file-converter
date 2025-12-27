@@ -248,6 +248,82 @@ app.post('/api/convert/xlsx-to-pdf', upload.single('file'), async (req, res) => 
 	}
 })
 
+// ==========================================
+// 2. XLSX → Images (Har bir sheet alohida rasm)
+// ==========================================
+app.post('/api/convert/xlsx-to-images', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputDir = null
+	let zipPath = null
+
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Fayl yuklanmadi' })
+		}
+
+		inputPath = req.file.path
+		const baseName = path.basename(inputPath, path.extname(inputPath))
+		outputDir = path.join('/tmp/conversions', `${baseName}-images`)
+		await fs.mkdir(outputDir, { recursive: true })
+
+		// Excel o'qish
+		const workbook = XLSX.readFile(inputPath)
+
+		// Har bir sheet uchun rasm yaratish
+		for (let i = 0; i < workbook.SheetNames.length; i++) {
+			const sheetName = workbook.SheetNames[i]
+			const sheet = workbook.Sheets[sheetName]
+			const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+
+			// HTML table yaratish
+			let html = '<table border="1" style="border-collapse: collapse;">'
+			data.forEach((row) => {
+				html += '<tr>'
+				row.forEach((cell) => {
+					html += `<td style="padding: 8px; min-width: 100px;">${cell || ''}</td>`
+				})
+				html += '</tr>'
+			})
+			html += '</table>'
+
+			// HTML ni rasm qilish (Puppeteer orqali)
+			const puppeteer = require('puppeteer')
+			const browser = await puppeteer.launch({ args: ['--no-sandbox'] })
+			const page = await browser.newPage()
+			await page.setContent(html)
+			const imagePath = path.join(outputDir, `sheet_${i + 1}_${sheetName}.png`)
+			await page.screenshot({ path: imagePath, fullPage: true })
+			await browser.close()
+		}
+
+		// ZIP yaratish
+		zipPath = path.join('/tmp/conversions', `${baseName}-images.zip`)
+		const output = require('fs').createWriteStream(zipPath)
+		const archive = archiver('zip', { zlib: { level: 9 } })
+
+		archive.pipe(output)
+		archive.directory(outputDir, false)
+		await archive.finalize()
+
+		await new Promise((resolve, reject) => {
+			output.on('close', resolve)
+			output.on('error', reject)
+		})
+
+		const zipBuffer = await fs.readFile(zipPath)
+
+		res.setHeader('Content-Type', 'application/zip')
+		res.setHeader('Content-Disposition', `attachment; filename="${baseName}-images.zip"`)
+		res.send(zipBuffer)
+	} catch (error) {
+		console.error('XLSX → Images xato:', error)
+		res.status(500).json({ error: 'Konvertatsiya xatosi', details: error.message })
+	} finally {
+		if (inputPath) await fs.unlink(inputPath).catch(() => {})
+		if (outputDir) await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
+		if (zipPath) await fs.unlink(zipPath).catch(() => {})
+	}
+})
 
 
 console.log('✅ XLSX Converter API endpoints qo\'shildi')
