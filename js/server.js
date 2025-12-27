@@ -494,6 +494,104 @@ app.post('/api/convert/xlsx-merge-to-pdf', upload.array('files', 10), async (req
 	}
 })
 
+// ==========================================
+// 5. XLSX Metadata Analyzer
+// ==========================================
+app.post('/api/analyze/xlsx-metadata', upload.single('file'), async (req, res) => {
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Fayl yuklanmadi' })
+		}
+
+		const workbook = XLSX.readFile(req.file.path)
+
+		const metadata = {
+			fileName: req.file.originalname,
+			fileSize: req.file.size,
+			fileSizeFormatted: `${(req.file.size / 1024).toFixed(2)} KB`,
+			totalSheets: workbook.SheetNames.length,
+			sheets: [],
+		}
+
+		// Har bir sheet ma'lumotlari
+		workbook.SheetNames.forEach((sheetName) => {
+			const sheet = workbook.Sheets[sheetName]
+			const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+			const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1')
+
+			metadata.sheets.push({
+				name: sheetName,
+				rows: data.length,
+				columns: range.e.c + 1,
+				cells: (range.e.r + 1) * (range.e.c + 1),
+			})
+		})
+
+		await fs.unlink(req.file.path).catch(() => {})
+
+		res.json(metadata)
+	} catch (error) {
+		console.error('Metadata xato:', error)
+		res.status(500).json({ error: 'Metadata tahlil xatosi', details: error.message })
+	}
+})
+
+// ==========================================
+// 6. XLSX → CSV (Har bir sheet alohida CSV)
+// ==========================================
+app.post('/api/convert/xlsx-to-csv', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputDir = null
+	let zipPath = null
+
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Fayl yuklanmadi' })
+		}
+
+		inputPath = req.file.path
+		const baseName = path.basename(inputPath, path.extname(inputPath))
+		outputDir = path.join('/tmp/conversions', `${baseName}-csv`)
+		await fs.mkdir(outputDir, { recursive: true })
+
+		const workbook = XLSX.readFile(inputPath)
+
+		// Har bir sheet ni CSV ga
+		workbook.SheetNames.forEach((sheetName, idx) => {
+			const sheet = workbook.Sheets[sheetName]
+			const csv = XLSX.utils.sheet_to_csv(sheet)
+			const csvPath = path.join(outputDir, `${idx + 1}_${sheetName}.csv`)
+			require('fs').writeFileSync(csvPath, csv)
+		})
+
+		// ZIP yaratish
+		zipPath = path.join('/tmp/conversions', `${baseName}-csv.zip`)
+		const output = require('fs').createWriteStream(zipPath)
+		const archive = archiver('zip', { zlib: { level: 9 } })
+
+		archive.pipe(output)
+		archive.directory(outputDir, false)
+		await archive.finalize()
+
+		await new Promise((resolve, reject) => {
+			output.on('close', resolve)
+			output.on('error', reject)
+		})
+
+		const zipBuffer = await fs.readFile(zipPath)
+
+		res.setHeader('Content-Type', 'application/zip')
+		res.setHeader('Content-Disposition', `attachment; filename="${baseName}-csv.zip"`)
+		res.send(zipBuffer)
+	} catch (error) {
+		console.error('XLSX → CSV xato:', error)
+		res.status(500).json({ error: 'Konvertatsiya xatosi', details: error.message })
+	} finally {
+		if (inputPath) await fs.unlink(inputPath).catch(() => {})
+		if (outputDir) await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
+		if (zipPath) await fs.unlink(zipPath).catch(() => {})
+	}
+})
 
 console.log('✅ XLSX Converter API endpoints qo\'shildi')
 

@@ -23,22 +23,18 @@ COPY package*.json ./
 # Устанавливаем зависимости
 RUN npm ci --only=production
 
-# Создаем non-root пользователя ДО копирования файлов
-RUN useradd -m -u 1001 appuser
+# Копируем все файлы приложения
+COPY . .
 
-# Создаем директории с правильными правами
+# Создаем директорию для временных файлов с правильными правами
 RUN mkdir -p /tmp/conversions && \
     chmod 777 /tmp/conversions && \
     mkdir -p /app/public && \
-    mkdir -p /app/js && \
-    mkdir -p /app/style && \
-    chmod -R 755 /app
+    chmod 755 /app/public
 
-# Копируем все файлы приложения
-COPY --chown=appuser:appuser . .
-
-# Устанавливаем права на директории
-RUN chown -R appuser:appuser /app && \
+# Создаем non-root пользователя для безопасности
+RUN useradd -m -u 1001 appuser && \
+    chown -R appuser:appuser /app && \
     chown -R appuser:appuser /tmp/conversions
 
 # Переключаемся на non-root пользователя
