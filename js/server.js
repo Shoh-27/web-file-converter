@@ -154,6 +154,104 @@ app.post('/api/convert/pptx-to-pdf', upload.single('file'), async (req, res) => 
 	}
 })
 
+
+
+const XLSX = require('xlsx')
+const ExcelJS = require('exceljs')
+const PDFDocument = require('pdfkit')
+const sharp = require('sharp')
+const archiver = require('archiver')
+
+// ==========================================
+// 1. XLSX → PDF (Table formatda)
+// ==========================================
+app.post('/api/convert/xlsx-to-pdf', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputPath = null
+
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Fayl yuklanmadi' })
+		}
+
+		inputPath = req.file.path
+		outputPath = path.join('/tmp/conversions', `${Date.now()}.pdf`)
+
+		// Excel faylni o'qish
+		const workbook = XLSX.readFile(inputPath)
+		const sheetName = workbook.SheetNames[0]
+		const sheet = workbook.Sheets[sheetName]
+		const data = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+
+		// PDF yaratish
+		const doc = new PDFDocument({ margin: 30 })
+		const stream = require('fs').createWriteStream(outputPath)
+		doc.pipe(stream)
+
+		// Sarlavha
+		doc.fontSize(16).text(`Sheet: ${sheetName}`, { align: 'center' })
+		doc.moveDown()
+
+		// Jadval chizish
+		const cellWidth = 80
+		const cellHeight = 25
+		let yPos = doc.y
+
+		data.forEach((row, rowIndex) => {
+			let xPos = 30
+
+			row.forEach((cell, colIndex) => {
+				// Border
+				doc.rect(xPos, yPos, cellWidth, cellHeight).stroke()
+
+				// Matn
+				const text = String(cell || '')
+				doc.fontSize(10).text(text, xPos + 5, yPos + 8, {
+					width: cellWidth - 10,
+					height: cellHeight - 10,
+					ellipsis: true,
+				})
+
+				xPos += cellWidth
+			})
+
+			yPos += cellHeight
+
+			// Yangi sahifa
+			if (yPos > 700 && rowIndex < data.length - 1) {
+				doc.addPage()
+				yPos = 50
+			}
+		})
+
+		doc.end()
+
+		await new Promise((resolve, reject) => {
+			stream.on('finish', resolve)
+			stream.on('error', reject)
+		})
+
+		const pdfBuffer = await fs.readFile(outputPath)
+
+		res.setHeader('Content-Type', 'application/pdf')
+		res.setHeader(
+			'Content-Disposition',
+			`attachment; filename="excel-${Date.now()}.pdf"`
+		)
+		res.send(pdfBuffer)
+	} catch (error) {
+		console.error('XLSX → PDF xato:', error)
+		res.status(500).json({ error: 'Konvertatsiya xatosi', details: error.message })
+	} finally {
+		if (inputPath) await fs.unlink(inputPath).catch(() => {})
+		if (outputPath) await fs.unlink(outputPath).catch(() => {})
+	}
+})
+
+
+
+console.log('✅ XLSX Converter API endpoints qo\'shildi')
+
 // API endpoint для конвертации множественных файлов
 app.post('/api/convert/batch', upload.array('files', 10), async (req, res) => {
 	const { operation } = req.body
