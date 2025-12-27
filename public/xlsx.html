@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel/XLSX Converter - Professional Tool</title>
+    <link rel="stylesheet" href="../style/xlsx.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Excel/XLSX Converter</h1>
+            <p>Excel fayllarini turli formatlarga professional konvertatsiya qiling</p>
+        </header>
+
+        <main>
+            <!-- Konvertatsiya turlari -->
+            <section class="conversion-types">
+                <h2>Konvertatsiya turini tanlang:</h2>
+                <div class="type-grid">
+                    <button class="type-card" data-type="xlsx-to-pdf">
+                        <div class="icon">📄</div>
+                        <h3>XLSX → PDF</h3>
+                        <p>Excel faylni PDF jadval qilib konvertatsiya</p>
+                    </button>
+
+                    <button class="type-card" data-type="xlsx-to-images">
+                        <div class="icon">🖼️</div>
+                        <h3>XLSX → Images</h3>
+                        <p>Har bir sheet ni alohida rasm qilish</p>
+                    </button>
+
+                    <button class="type-card" data-type="xlsx-sheets-to-pdf">
+                        <div class="icon">📑</div>
+                        <h3>XLSX Sheets → PDF</h3>
+                        <p>Ma'lum sheetlarni tanlang</p>
+                    </button>
+
+                    <button class="type-card" data-type="xlsx-merge-pdf">
+                        <div class="icon">🔗</div>
+                        <h3>Ko'p XLSX → PDF</h3>
+                        <p>Bir nechta Excel ni birlashtirish</p>
+                    </button>
+
+                    <button class="type-card" data-type="xlsx-metadata">
+                        <div class="icon">🔍</div>
+                        <h3>Metadata Analyzer</h3>
+                        <p>Excel fayl ma'lumotlarini ko'ring</p>
+                    </button>
+
+                    <button class="type-card" data-type="xlsx-to-csv">
+                        <div class="icon">📋</div>
+                        <h3>XLSX → CSV</h3>
+                        <p>CSV formatga konvertatsiya</p>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Upload bo'limi -->
+            <section class="upload-section" id="uploadSection" style="display: none;">
+                <div class="selected-type">
+                    <h3 id="selectedTypeTitle"></h3>
+                </div>
+
+                <!-- Single upload -->
+                <div class="upload-area" id="singleUpload">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+                    <div class="upload-box" id="uploadBox">
+                        <div class="upload-icon">📁</div>
+                        <h3>Excel faylni bu yerga torting yoki bosing</h3>
+                        <p>Faqat XLSX/XLS fayllar (maks. 20MB)</p>
+                    </div>
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <div class="file-details">
+                            <span class="file-name" id="fileName"></span>
+                            <span class="file-size" id="fileSize"></span>
+                        </div>
+                        <button class="btn-remove" id="removeFile">✕</button>
+                    </div>
+                </div>
+
+                <!-- Multiple upload -->
+                <div class="upload-area" id="multipleUpload" style="display: none;">
+                    <input type="file" id="multipleFileInput" accept=".xlsx,.xls" multiple hidden>
+                    <div class="upload-box" id="multipleUploadBox">
+                        <div class="upload-icon">📁</div>
+                        <h3>Ko'p Excel fayllarni torting</h3>
+                        <p>Maks. 10 ta fayl</p>
+                    </div>
+                    <div class="files-list" id="filesList"></div>
+                </div>
+
+                <!-- Options -->
+                <div class="options" id="conversionOptions">
+                    <!-- Sheets selector -->
+                    <div class="option-group" id="sheetsOption" style="display: none;">
+                        <label>
+                            Sheetlar (vergul bilan):
+                            <input type="text" id="sheetsInput" placeholder="0,1,2" value="0">
+                            <small>Masalan: 0,1,2 (birinchi uchta sheet)</small>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Convert button -->
+                <button class="btn-convert" id="convertBtn" disabled>
+                    <span class="btn-text">Konvertatsiya qilish</span>
+                    <span class="btn-loader" style="display: none;">⏳ Jarayon...</span>
+                </button>
+
+                <button class="btn-back" id="backBtn">⬅️ Ortga</button>
+            </section>
+
+            <!-- Progress -->
+            <div class="progress-section" id="progressSection" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Konvertatsiya boshlandi...</p>
+            </div>
+
+            <!-- Result -->
+            <section class="result-section" id="resultSection" style="display: none;">
+                <div class="result-box success" id="resultSuccess" style="display: none;">
+                    <div class="result-icon">✅</div>
+                    <h3>Muvaffaqiyatli!</h3>
+                    <p id="resultMessage"></p>
+                    <button class="btn-download" id="downloadBtn">⬇️ Yuklab olish</button>
+                </div>
+
+                <div class="result-box error" id="resultError" style="display: none;">
+                    <div class="result-icon">❌</div>
+                    <h3>Xatolik</h3>
+                    <p id="errorMessage"></p>
+                </div>
+
+                <!-- Metadata -->
+                <div class="metadata-result" id="metadataResult" style="display: none;">
+                    <h3>📊 Excel Ma'lumotlari</h3>
+                    <div class="metadata-grid" id="metadataGrid"></div>
+                    
+                    <div class="sheets-info" id="sheetsInfo" style="margin-top: 20px;">
+                        <h4>Sheets Ma'lumotlari:</h4>
+                        <div id="sheetsList"></div>
+                    </div>
+                </div>
+
+                <button class="btn-convert-another" id="convertAnotherBtn">🔄 Yana konvertatsiya</button>
+            </section>
+        </main>
+
+        <footer>
+            <p>© 2024 Excel/XLSX Converter. Professional konvertatsiya vositasi.</p>
+        </footer>
+    </div>
+
+    <script src="../js/xlsx.js"></script>
+</body>
+</html>
