@@ -4,6 +4,9 @@ const path = require('path')
 const fs = require('fs').promises
 const { exec } = require('child_process')
 const { promisify } = require('util')
+const archiver = require('archiver')
+const sharp = require('sharp')
+const PDFDocument = require('pdfkit')
 
 const execPromise = promisify(exec)
 const app = express()
@@ -112,6 +115,44 @@ app.post(
 		}
 	}
 )
+
+app.post('/api/convert/pptx-to-pdf', upload.single('file'), async (req, res) => {
+	let inputPath = null
+	let outputPath = null
+
+	try {
+		if (!req.file) {
+			return res.status(400).json({ error: 'Файл не загружен' })
+		}
+
+		inputPath = req.file.path
+		const outputDir = path.dirname(inputPath)
+		const baseName = path.basename(inputPath, path.extname(inputPath))
+		outputPath = path.join(outputDir, `${baseName}.pdf`)
+
+		console.log(`PPTX → PDF: ${inputPath} -> ${outputPath}`)
+
+		const command = `libreoffice --headless --convert-to pdf --outdir "${outputDir}" "${inputPath}"`
+
+		await execPromise(command, {
+			timeout: 120000,
+			maxBuffer: 20 * 1024 * 1024,
+		})
+
+		await fs.access(outputPath)
+		const pdfBuffer = await fs.readFile(outputPath)
+
+		res.setHeader('Content-Type', 'application/pdf')
+		res.setHeader('Content-Disposition', `attachment; filename="${baseName}.pdf"`)
+		res.send(pdfBuffer)
+	} catch (error) {
+		console.error('PPTX → PDF ошибка:', error)
+		res.status(500).json({ error: 'Ошибка конвертации', details: error.message })
+	} finally {
+		if (inputPath) await fs.unlink(inputPath).catch(() => {})
+		if (outputPath) await fs.unlink(outputPath).catch(() => {})
+	}
+})
 
 // API endpoint для конвертации множественных файлов
 app.post('/api/convert/batch', upload.array('files', 10), async (req, res) => {
